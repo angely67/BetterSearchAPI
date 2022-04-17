@@ -1,4 +1,5 @@
 from flask import Flask, request
+from flask_cors import CORS, cross_origin
 from txtai.embeddings import Embeddings
 from txtai.pipeline import Extractor
 import json
@@ -7,69 +8,65 @@ extractor = Extractor(embeddings, "distilbert-base-cased-distilled-squad")
 
 app = Flask(__name__)
 
-@app.route("/")
-def hello():
-    return "Hello, World!"
-
-@app.route('/test/<name>', methods=['GET'])
-def testing(name=None):
-    return "This is testing. Name="+name
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 
 @app.route('/api/qa', methods=['POST'])
+@cross_origin()
 def question_answer():
     data = request.json["data"]
 
     question = request.json["question"]
+    
+    try:
+        answer = extractor([(question, question, question, False)], data)
 
-    print("----", question, "----")
-    answer = extractor([(question, question, question, False)], data)
-    print(answer[0][1])
-    embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
-    searched = embeddings.search(answer[0][1], 100)
-    searched = [(data[r[0]], r[1]) for r in searched]
-    print(searched)
+        embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
+        searched = embeddings.search(answer[0][1], 100)
+        searched = [(data[r[0]], r[1]) for r in searched]
 
-    searched = embeddings.search(answer[0][0], 100)
-    searched = [(data[r[0]], r[1]) for r in searched]
+        searched = embeddings.search(answer[0][0], 100)
+        searched = [(data[r[0]], r[1]) for r in searched]
 
-    print(searched)
+        searched = embeddings.search(answer[0][0]+" "+answer[0][1], 100)
+        results = []
+        if len(searched) > 0:
+            results = [data[r[0]] for r in searched[1:] if r[1] >= max(searched[0][1] * 2 / 3, 0.15)]
+        results.insert(0, data[searched[0][0]])
 
-    searched = embeddings.search(answer[0][0]+" "+answer[0][1], 100)
-    searched = [(data[r[0]], r[1]) for r in searched]
+        print(answer)
+        print(searched[0])
+        print(results[0])
+        print(len(results))
 
-    print(searched)
-
-    return json.dumps(answer)
+        return json.dumps({"answer": answer, "evidence": results})
+    except:
+        return "Internal Server Error", 500
 
 
 @app.route('/api/semantic', methods=['POST'])
+@cross_origin()
 def semantic():
-    print(request.json)
     body = request.json
     data = body["data"]
     query = body["query"]
-    '''data = ["US tops 5 million confirmed virus cases",
-            "Canada's last fully intact ice shelf has suddenly collapsed, forming a Manhattan-sized iceberg",
-            "Beijing mobilises invasion craft along coast as Taiwan tensions escalate",
-            "The National Park Service warns against sacrificing slower friends in a bear attack",
-            "Maine man wins $1M from $25 lottery ticket",
-            "Make huge profits without work, earn up to $100,000 a day"]'''
-    embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
-    print("%-20s %s" % ("Query", "Best Match"))
-    print("-" * 50)
-
-    searched = embeddings.search(query, 100)
-    print(searched)
-
-    results = []
-    if len(searched) > 0:
-        results = [data[r[0]] for r in searched[1:] if r[1] >= 0.1]
-    results.insert(0, data[searched[0][0]])
-
-    print(results)
-
-    return json.dumps(results)
+    try:
+        print("indexing")
+        embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
+        print("searching")
+        searched = embeddings.search(query, 100)
+        print("getting results")
+        results = []
+        if len(searched) > 0:
+            results = [data[r[0]] for r in searched[1:] if r[1] >= max(searched[0][1] * 2 / 3, 0.15)]
+        results.insert(0, data[searched[0][0]])
+        print(searched[0])
+        print(results[0])
+        print(len(results))
+        return json.dumps(results)
+    except:
+        return "Internal Server Error", 500
 
 if __name__ == '__main__':
     # Threaded option to enable multiple instances for multiple user access support
