@@ -16,30 +16,18 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 @cross_origin()
 def question_answer():
     data = request.json["data"]
-
     question = request.json["question"]
     
     try:
         answer = extractor([(question, question, question, False)], data)
 
         embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
-        searched = embeddings.search(answer[0][1], 100)
-        searched = [(data[r[0]], r[1]) for r in searched]
-
-        searched = embeddings.search(answer[0][0], 100)
-        searched = [(data[r[0]], r[1]) for r in searched]
 
         searched = embeddings.search(answer[0][0]+" "+answer[0][1], 100)
         results = []
         if len(searched) > 0:
             results = [data[r[0]] for r in searched[1:] if r[1] >= max(searched[0][1] * 2 / 3, 0.15)]
         results.insert(0, data[searched[0][0]])
-
-        print(answer)
-        print(searched[0])
-        print(results[0])
-        print(len(results))
-
         return json.dumps({"answer": answer, "evidence": results})
     except:
         return "Internal Server Error", 500
@@ -52,18 +40,12 @@ def semantic():
     data = body["data"]
     query = body["query"]
     try:
-        print("indexing")
         embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
-        print("searching")
         searched = embeddings.search(query, 100)
-        print("getting results")
         results = []
         if len(searched) > 0:
             results = [data[r[0]] for r in searched[1:] if r[1] >= max(searched[0][1] * 2 / 3, 0.15)]
         results.insert(0, data[searched[0][0]])
-        print(searched[0])
-        print(results[0])
-        print(len(results))
         return json.dumps(results)
     except:
         return "Internal Server Error", 500
