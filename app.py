@@ -11,7 +11,7 @@ app = Flask(__name__)
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-
+# route for text Q&A
 @app.route('/api/qa', methods=['POST'])
 @cross_origin()
 def question_answer():
@@ -20,9 +20,7 @@ def question_answer():
     
     try:
         answer = extractor([(question, question, question, False)], data)
-
         embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
-
         searched = embeddings.search(answer[0][0]+" "+answer[0][1], 100)
         results = []
         if len(searched) > 0:
@@ -32,13 +30,14 @@ def question_answer():
     except:
         return "Internal Server Error", 500
 
-
+# route for semantic search
 @app.route('/api/semantic', methods=['POST'])
 @cross_origin()
 def semantic():
     body = request.json
     data = body["data"]
     query = body["query"]
+
     try:
         embeddings.index([(uid, text, None) for uid, text in enumerate(data)])
         searched = embeddings.search(query, 100)
